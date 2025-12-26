@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>自家製電卓</title>
+    <meta name="apple-mobile-web-app-title" content="自家製電卓">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <style>
+        /* 全体の設定 */
+        body { 
+            background-color: #2c3e50; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; padding: 0; 
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; 
+            overflow: hidden; user-select: none; -webkit-user-select: none; 
+        }
+        
+        /* 上部エリア */
+        .grid-container { 
+            display: flex; flex: 1; gap: 4px; padding: 4px; 
+            background: #34495e; overflow: hidden; min-height: 0;
+        }
+        .column { flex: 1; display: flex; flex-direction: column; background: #ecf0f1; border-radius: 4px; overflow: hidden; }
+        
+        .col-header { 
+            background: #bdc3c7; text-align: right; padding: 0 6px; 
+            border-bottom: 2px solid #7f8c8d; display: flex; 
+            flex-direction: column; justify-content: center; 
+            height: 55px; flex-shrink: 0; 
+        }
+        .total-value { font-size: 2.2rem; font-weight: 800; color: #2c3e50; line-height: 1; letter-spacing: -1px; }
+        .total-value.neg { color: #e74c3c; }
+        
+        .cells-area { flex: 1; overflow-y: auto; padding-bottom: 50px; -webkit-overflow-scrolling: touch; }
+        
+        /* セル */
+        .cell { 
+            height: 42px; 
+            border-bottom: 1px solid #dcdcdc; 
+            background: #fff; 
+            display: flex; 
+            align-items: center; 
+            justify-content: flex-end; 
+            padding-right: 12px; 
+            cursor: pointer; 
+            position: relative;
+        }
+        
+        /* 演算子アイコン */
+        .op-indicator { 
+            width: auto; 
+            background: transparent; 
+            border: none; 
+            margin-right: 8px; 
+            font-size: 1.6rem; 
+            font-weight: bold; 
+            color: #bdc3c7; 
+        }
+        
+        /* 数字部分 */
+        .val-display { 
+            flex: 0 0 auto; 
+            text-align: right; 
+            font-size: 1.6rem; 
+            font-weight: 500; 
+            color: #333; 
+        }
+
+        /* 行番号 */
+        .cell::before { content: attr(data-row); position: absolute; left: 4px; top: 12px; font-size: 0.7rem; color: #ccc; z-index: 2; }
+        
+        /* 選択中のセル */
+        .cell.active { background: #ffd600; }
+        .cell.active .val-display, .cell.active .op-indicator { color: black !important; font-weight: bold; }
+
+        /* 色変えルール */
+        .is-red .op-indicator, .is-red .val-display { color: #e74c3c !important; }
+        .is-multi .op-indicator, .is-multi .val-display { color: #e67e22 !important; } 
+        .is-div .op-indicator, .is-div .val-display { color: #9b59b6 !important; }   
+        
+        /* ★追加：バージョン表記のスタイル */
+        .version-label {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #bdc3c7; /* 薄いグレー */
+            padding: 20px 0 10px 0;
+            font-weight: normal;
+            opacity: 0.7;
+        }
+
+        /* ボタン類 */
+        .clear-bar { display: flex; gap: 4px; padding: 2px 4px; background: #34495e; flex-shrink: 0; }
+        .col-clear-btn { flex: 1; font-size: 0.7rem; padding: 8px; background: #7f8c8d; color: white; border-radius: 3px; border:none; }
+        
+        .keypad { height: 42%; min-height: 280px; background: #2c3e50; padding: 5px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 6px; padding-bottom: 20px; flex-shrink: 0; }
+        
+        button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
+        button:active { transform: translateY(2px); box-shadow: none; }
+        button.op { background: #e67e22; color: white; box-shadow: 0 3px 0 #d35400; }
+        button.eq { background: #3498db; color: white; box-shadow: 0 3px 0 #2980b9; } 
+        button.func { background: #95a5a6; color: white; box-shadow: 0 3px 0 #7f8c8d; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div class="grid-container">
+        <div class="column"><div class="col-header"><div class="total-value" id="total0">0</div></div><div class="cells-area" id="list0"></div></div>
+        <div class="column"><div class="col-header"><div class="total-value" id="total1">0</div></div><div class="cells-area" id="list1"></div></div>
+        <div class="column"><div class="col-header"><div class="total-value" id="total2">0</div></div><div class="cells-area" id="list2"></div></div>
+    </div>
+
+    <div class="clear-bar">
+        <button class="col-clear-btn" onclick="clearList(0)">List1 Clear</button>
+        <button class="col-clear-btn" onclick="clearList(1)">List2 Clear</button>
+        <button class="col-clear-btn" onclick="clearList(2)">List3 Clear</button>
+    </div>
+
+    <div class="keypad">
+        <button class="func" onclick="cellClear()">C</button>
+        <button class="func" onclick="toggleSign()">+/-</button>
+        <button class="func" onclick="bs()">⌫</button>
+        <button class="op" onclick="setOp('/')">÷</button>
+        
+        <button onclick="num('7')">7</button>
+        <button onclick="num('8')">8</button>
+        <button onclick="num('9')">9</button>
+        <button class="op" onclick="setOp('*')">×</button>
+
+        <button onclick="num('4')">4</button>
+        <button onclick="num('5')">5</button>
+        <button onclick="num('6')">6</button>
+        <button class="op" onclick="setOp('-')">-</button>
+
+        <button onclick="num('1')">1</button>
+        <button onclick="num('2')">2</button>
+        <button onclick="num('3')">3</button>
+        <button class="op" onclick="setOp('+')">+</button>
+
+        <button onclick="num('0')">0</button>
+        <button onclick="num('00')">00</button>
+        <button onclick="dot()">.</button>
+        <button class="eq" onclick="nextLine()">⮐</button> 
+    </div>
+
+<script>
+    const ROWS = 20; 
+    let listData = [[], [], []]; 
+    let activePos = { col: 0, row: 0 };
+
+    window.onload = function() { 
+        for(let i=0; i<3; i++) { 
+            let c = document.getElementById('list'+i); 
+            for(let r=0; r<ROWS; r++) { 
+                listData[i][r] = { val: "", op: "+" }; 
+                let d = document.createElement('div'); 
+                d.className = 'cell'; 
+                d.id = `c-${i}-${r}`; 
+                d.dataset.row = r + 1; 
+                d.onclick = () => selectCell(i, r); 
+                let o = document.createElement('span'); 
+                o.className = 'op-indicator'; 
+                o.id = `op-${i}-${r}`; 
+                o.innerText = ""; 
+                let v = document.createElement('div'); 
+                v.className = 'val-display'; 
+                v.id = `val-${i}-${r}`; 
+                d.appendChild(o); 
+                d.appendChild(v); 
+                c.appendChild(d); 
+            }
+            
+            // ★追加：一番右のリスト(List 3, i=2)の最後にバージョン表記を追加
+            if(i === 2) {
+                let verDiv = document.createElement('div');
+                verDiv.className = 'version-label';
+                verDiv.innerText = "Ver 1.10";
+                c.appendChild(verDiv);
+            }
+        } 
+        selectCell(0, 0); 
+    };
+    
+    function selectCell(c, r) { let p = document.getElementById(`c-${activePos.col}-${activePos.row}`); if(p) p.classList.remove('active'); activePos = { col: c, row: r }; let n = document.getElementById(`c-${c}-${r}`); n.classList.add('active'); n.scrollIntoView({behavior: "smooth", block: "nearest"}); }
+    function num(n) { let c = listData[activePos.col][activePos.row]; if(c.val === "0" && n !== ".") c.val = ""; c.val += n; up(activePos.col, activePos.row); calc(activePos.col); }
+    function dot() { let c = listData[activePos.col][activePos.row]; if(!c.val.includes('.')) { if(c.val === "") c.val = "0"; c.val += "."; } up(activePos.col, activePos.row); }
+    
+    function setOp(o) { 
+        if(activePos.row < ROWS - 1) {
+            selectCell(activePos.col, activePos.row + 1);
+            listData[activePos.col][activePos.row].op = o; 
+            up(activePos.col, activePos.row); 
+            calc(activePos.col); 
+        }
+    }
+    
+    function nextLine() { if(activePos.row < ROWS - 1) selectCell(activePos.col, activePos.row + 1); }
+    function toggleSign() { let c = listData[activePos.col][activePos.row]; if(c.val.startsWith("-")) c.val = c.val.substring(1); else if(c.val !== "") c.val = "-" + c.val; up(activePos.col, activePos.row); calc(activePos.col); }
+    function bs() { let c = listData[activePos.col][activePos.row]; if(c.val.length > 0) c.val = c.val.slice(0, -1); else c.op = "+"; up(activePos.col, activePos.row); calc(activePos.col); }
+    function cellClear() { listData[activePos.col][activePos.row].val = ""; up(activePos.col, activePos.row); calc(activePos.col); }
+    
+    function up(c, r) { 
+        let d = listData[c][r]; 
+        let cell = document.getElementById(`c-${c}-${r}`);
+        let o = document.getElementById(`op-${c}-${r}`); 
+        let v = document.getElementById(`val-${c}-${r}`); 
+        
+        o.className = 'op-indicator';
+        cell.classList.remove('is-red', 'is-multi', 'is-div');
+
+        let s = ""; 
+        if(d.op === '+') { s = ""; } 
+        if(d.op === '-') { s = "-"; cell.classList.add('is-red'); } 
+        if(d.op === '*') { s = "×"; cell.classList.add('is-multi'); } 
+        if(d.op === '/') { s = "÷"; cell.classList.add('is-div'); } 
+        
+        if(parseFloat(d.val) < 0) {
+             cell.classList.add('is-red');
+        }
+
+        o.innerText = s; 
+        v.innerText = d.val; 
+    }
+
+    function calc(c) { 
+        let t = 0; 
+        for(let r=0; r<ROWS; r++) { 
+            let i = listData[c][r]; 
+            let v = parseFloat(i.val); 
+            if(isNaN(v)) continue; 
+            switch(i.op) { 
+                case '+': t += v; break; 
+                case '-': t -= v; break; 
+                case '*': t *= v; break; 
+                case '/': if(v !== 0) t /= v; break; 
+            } 
+        } 
+        let e = document.getElementById(`total${c}`); 
+        let dt = Number.isInteger(t) ? t : parseFloat(t.toFixed(4)); 
+        e.innerText = dt.toLocaleString(); 
+        if(t < 0) e.classList.add('neg'); else e.classList.remove('neg'); 
+    }
+    
+    function clearList(c) { for(let r=0; r<ROWS; r++) { listData[c][r] = { val: "", op: "+" }; up(c, r); } calc(c); selectCell(c, 0); }
+</script>
+</body>
+</html>
