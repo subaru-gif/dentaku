@@ -102,16 +102,18 @@
         
         .keypad { height: 42%; min-height: 280px; background: #2c3e50; padding: 5px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 6px; padding-bottom: 20px; flex-shrink: 0; }
         
-        /* 文字サイズ 1.8rem */
-        button { border: none; border-radius: 6px; font-size: 1.8rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
+        /* 数字・演算子の基本サイズ (2.2rem) */
+        button { border: none; border-radius: 6px; font-size: 2.2rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
         button:active { transform: translateY(2px); box-shadow: none; }
         
         button.op { background: #e67e22; color: white; box-shadow: 0 3px 0 #d35400; }
         
-        /* 改行ボタンは 1.4rem */
+        /* 改行ボタンだけ少し小さく (1.4rem) */
         button.eq { background: #3498db; color: white; box-shadow: 0 3px 0 #2980b9; font-size: 1.4rem; } 
         
-        button.func { background: #95a5a6; color: white; box-shadow: 0 3px 0 #7f8c8d; font-size: 1.2rem; }
+        /* ★修正：機能ボタン(C, +/-, BS)も大きくする */
+        /* 指定を外せば親のbutton(2.2rem)を継承しますが、念のため明示的に指定 */
+        button.func { background: #95a5a6; color: white; box-shadow: 0 3px 0 #7f8c8d; font-size: 2.2rem; }
     </style>
 </head>
 <body>
@@ -181,11 +183,11 @@
                 d.appendChild(v); 
                 c.appendChild(d); 
             }
-            // ★変更：Ver 1.16 表記
+            // ★変更：Ver 1.18 表記
             if(i === 2) {
                 let verDiv = document.createElement('div');
                 verDiv.className = 'version-label';
-                verDiv.innerText = "Ver 1.16";
+                verDiv.innerText = "Ver 1.18";
                 c.appendChild(verDiv);
             }
         } 
@@ -196,16 +198,14 @@
     function num(n) { let c = listData[activePos.col][activePos.row]; if(c.val === "0" && n !== ".") c.val = ""; c.val += n; up(activePos.col, activePos.row); calc(activePos.col); }
     function dot() { let c = listData[activePos.col][activePos.row]; if(!c.val.includes('.')) { if(c.val === "") c.val = "0"; c.val += "."; } up(activePos.col, activePos.row); }
     
-    // 数字がある時だけ改行、ない時はその場で記号変更
+    // 数字がある時だけ改行
     function setOp(o) { 
         let currentVal = listData[activePos.col][activePos.row].val;
         
-        // 数字が入っている場合のみ、次の行へ移動
         if(currentVal !== "" && activePos.row < ROWS - 1) {
             selectCell(activePos.col, activePos.row + 1);
         }
         
-        // (移動した後、または移動せずに) 記号をセット
         listData[activePos.col][activePos.row].op = o; 
         up(activePos.col, activePos.row); 
         calc(activePos.col); 
@@ -213,16 +213,18 @@
     
     function nextLine() { if(activePos.row < ROWS - 1) selectCell(activePos.col, activePos.row + 1); }
     
-    // +/-ボタン。空の時は何もしない。ある時だけ確実に反転。
+    // +/-ボタンの判定（--にならないようにする）
     function toggleSign() { 
         let c = listData[activePos.col][activePos.row]; 
-        if(c.val === "") return; // 空なら無視
+        if(c.val === "") return; 
 
-        if(c.val.startsWith("-")) {
-            c.val = c.val.substring(1); // マイナスを消す
+        let strVal = String(c.val);
+        if(strVal.startsWith("-")) {
+            c.val = strVal.replace(/^-+/g, ""); 
         } else {
-            c.val = "-" + c.val; // マイナスをつける
+            c.val = "-" + strVal; 
         }
+        
         up(activePos.col, activePos.row); 
         calc(activePos.col); 
     }
@@ -245,7 +247,6 @@
         if(d.op === '*') { s = "×"; cell.classList.add('is-multi'); } 
         if(d.op === '/') { s = "÷"; cell.classList.add('is-div'); } 
         
-        // 数字自体がマイナスの時も赤くする
         if(parseFloat(d.val) < 0) {
              cell.classList.add('is-red');
         }
