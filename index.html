@@ -86,26 +86,31 @@
         .is-multi .op-indicator, .is-multi .val-display { color: #e67e22 !important; } 
         .is-div .op-indicator, .is-div .val-display { color: #9b59b6 !important; }   
         
-        /* ★追加：バージョン表記のスタイル */
+        /* バージョン表記 */
         .version-label {
             text-align: center;
             font-size: 0.7rem;
-            color: #bdc3c7; /* 薄いグレー */
+            color: #bdc3c7; 
             padding: 20px 0 10px 0;
             font-weight: normal;
             opacity: 0.7;
         }
 
-        /* ボタン類 */
+        /* ボタンエリア */
         .clear-bar { display: flex; gap: 4px; padding: 2px 4px; background: #34495e; flex-shrink: 0; }
         .col-clear-btn { flex: 1; font-size: 0.7rem; padding: 8px; background: #7f8c8d; color: white; border-radius: 3px; border:none; }
         
         .keypad { height: 42%; min-height: 280px; background: #2c3e50; padding: 5px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 6px; padding-bottom: 20px; flex-shrink: 0; }
         
-        button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
+        /* 文字サイズ 1.8rem */
+        button { border: none; border-radius: 6px; font-size: 1.8rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
         button:active { transform: translateY(2px); box-shadow: none; }
+        
         button.op { background: #e67e22; color: white; box-shadow: 0 3px 0 #d35400; }
-        button.eq { background: #3498db; color: white; box-shadow: 0 3px 0 #2980b9; } 
+        
+        /* 改行ボタンは 1.4rem */
+        button.eq { background: #3498db; color: white; box-shadow: 0 3px 0 #2980b9; font-size: 1.4rem; } 
+        
         button.func { background: #95a5a6; color: white; box-shadow: 0 3px 0 #7f8c8d; font-size: 1.2rem; }
     </style>
 </head>
@@ -176,12 +181,11 @@
                 d.appendChild(v); 
                 c.appendChild(d); 
             }
-            
-            // ★追加：一番右のリスト(List 3, i=2)の最後にバージョン表記を追加
+            // ★変更：Ver 1.16 表記
             if(i === 2) {
                 let verDiv = document.createElement('div');
                 verDiv.className = 'version-label';
-                verDiv.innerText = "Ver 1.10";
+                verDiv.innerText = "Ver 1.16";
                 c.appendChild(verDiv);
             }
         } 
@@ -192,17 +196,37 @@
     function num(n) { let c = listData[activePos.col][activePos.row]; if(c.val === "0" && n !== ".") c.val = ""; c.val += n; up(activePos.col, activePos.row); calc(activePos.col); }
     function dot() { let c = listData[activePos.col][activePos.row]; if(!c.val.includes('.')) { if(c.val === "") c.val = "0"; c.val += "."; } up(activePos.col, activePos.row); }
     
+    // 数字がある時だけ改行、ない時はその場で記号変更
     function setOp(o) { 
-        if(activePos.row < ROWS - 1) {
+        let currentVal = listData[activePos.col][activePos.row].val;
+        
+        // 数字が入っている場合のみ、次の行へ移動
+        if(currentVal !== "" && activePos.row < ROWS - 1) {
             selectCell(activePos.col, activePos.row + 1);
-            listData[activePos.col][activePos.row].op = o; 
-            up(activePos.col, activePos.row); 
-            calc(activePos.col); 
         }
+        
+        // (移動した後、または移動せずに) 記号をセット
+        listData[activePos.col][activePos.row].op = o; 
+        up(activePos.col, activePos.row); 
+        calc(activePos.col); 
     }
     
     function nextLine() { if(activePos.row < ROWS - 1) selectCell(activePos.col, activePos.row + 1); }
-    function toggleSign() { let c = listData[activePos.col][activePos.row]; if(c.val.startsWith("-")) c.val = c.val.substring(1); else if(c.val !== "") c.val = "-" + c.val; up(activePos.col, activePos.row); calc(activePos.col); }
+    
+    // +/-ボタン。空の時は何もしない。ある時だけ確実に反転。
+    function toggleSign() { 
+        let c = listData[activePos.col][activePos.row]; 
+        if(c.val === "") return; // 空なら無視
+
+        if(c.val.startsWith("-")) {
+            c.val = c.val.substring(1); // マイナスを消す
+        } else {
+            c.val = "-" + c.val; // マイナスをつける
+        }
+        up(activePos.col, activePos.row); 
+        calc(activePos.col); 
+    }
+
     function bs() { let c = listData[activePos.col][activePos.row]; if(c.val.length > 0) c.val = c.val.slice(0, -1); else c.op = "+"; up(activePos.col, activePos.row); calc(activePos.col); }
     function cellClear() { listData[activePos.col][activePos.row].val = ""; up(activePos.col, activePos.row); calc(activePos.col); }
     
@@ -221,6 +245,7 @@
         if(d.op === '*') { s = "×"; cell.classList.add('is-multi'); } 
         if(d.op === '/') { s = "÷"; cell.classList.add('is-div'); } 
         
+        // 数字自体がマイナスの時も赤くする
         if(parseFloat(d.val) < 0) {
              cell.classList.add('is-red');
         }
