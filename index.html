@@ -77,11 +77,22 @@
         /* 行番号 */
         .cell::before { content: attr(data-row); position: absolute; left: 4px; top: 12px; font-size: 0.7rem; color: #ccc; z-index: 2; }
         
-        /* 選択中のセル */
+        /* 選択中のセル（黄色） */
         .cell.active { background: #ffd600; }
-        .cell.active .val-display, .cell.active .op-indicator { color: black !important; font-weight: bold; }
+        
+        /* ★修正：CSSの詳細度を上げて、黄色い枠でも絶対に赤字にする */
+        .cell.active .val-display, .cell.active .op-indicator { color: black; font-weight: bold; } /* 通常の選択時は黒 */
+        
+        /* ↓ここが重要：is-redクラスがついている時は、選択中でも赤色を強制適用 */
+        .cell.active.is-red .val-display, 
+        .cell.active.is-red .op-indicator { 
+            color: #e74c3c !important; 
+        }
+        
+        .cell.active.is-multi .val-display, .cell.active.is-multi .op-indicator { color: #e67e22 !important; }
+        .cell.active.is-div .val-display, .cell.active.is-div .op-indicator { color: #9b59b6 !important; }
 
-        /* 色変えルール */
+        /* 通常時（非選択時）の色変えルール */
         .is-red .op-indicator, .is-red .val-display { color: #e74c3c !important; }
         .is-multi .op-indicator, .is-multi .val-display { color: #e67e22 !important; } 
         .is-div .op-indicator, .is-div .val-display { color: #9b59b6 !important; }   
@@ -102,17 +113,16 @@
         
         .keypad { height: 42%; min-height: 280px; background: #2c3e50; padding: 5px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 6px; padding-bottom: 20px; flex-shrink: 0; }
         
-        /* 数字・演算子の基本サイズ (2.2rem) */
+        /* ボタンサイズ 2.2rem統一 */
         button { border: none; border-radius: 6px; font-size: 2.2rem; font-weight: bold; cursor: pointer; background: #ecf0f1; color: #2c3e50; box-shadow: 0 3px 0 #95a5a6; }
         button:active { transform: translateY(2px); box-shadow: none; }
         
         button.op { background: #e67e22; color: white; box-shadow: 0 3px 0 #d35400; }
         
-        /* 改行ボタンだけ少し小さく (1.4rem) */
+        /* 改行ボタンだけ 1.4rem */
         button.eq { background: #3498db; color: white; box-shadow: 0 3px 0 #2980b9; font-size: 1.4rem; } 
         
-        /* ★修正：機能ボタン(C, +/-, BS)も大きくする */
-        /* 指定を外せば親のbutton(2.2rem)を継承しますが、念のため明示的に指定 */
+        /* 機能ボタンも2.2rem */
         button.func { background: #95a5a6; color: white; box-shadow: 0 3px 0 #7f8c8d; font-size: 2.2rem; }
     </style>
 </head>
@@ -183,7 +193,7 @@
                 d.appendChild(v); 
                 c.appendChild(d); 
             }
-            // ★変更：Ver 1.18 表記
+            // Ver 1.18 のまま
             if(i === 2) {
                 let verDiv = document.createElement('div');
                 verDiv.className = 'version-label';
@@ -198,14 +208,11 @@
     function num(n) { let c = listData[activePos.col][activePos.row]; if(c.val === "0" && n !== ".") c.val = ""; c.val += n; up(activePos.col, activePos.row); calc(activePos.col); }
     function dot() { let c = listData[activePos.col][activePos.row]; if(!c.val.includes('.')) { if(c.val === "") c.val = "0"; c.val += "."; } up(activePos.col, activePos.row); }
     
-    // 数字がある時だけ改行
     function setOp(o) { 
         let currentVal = listData[activePos.col][activePos.row].val;
-        
         if(currentVal !== "" && activePos.row < ROWS - 1) {
             selectCell(activePos.col, activePos.row + 1);
         }
-        
         listData[activePos.col][activePos.row].op = o; 
         up(activePos.col, activePos.row); 
         calc(activePos.col); 
@@ -213,16 +220,31 @@
     
     function nextLine() { if(activePos.row < ROWS - 1) selectCell(activePos.col, activePos.row + 1); }
     
-    // +/-ボタンの判定（--にならないようにする）
+    // ★修正：+/-ボタンのロジックを根本変更
     function toggleSign() { 
         let c = listData[activePos.col][activePos.row]; 
-        if(c.val === "") return; 
-
+        
+        // まず、数字にマイナス文字列（"--"の原因）がついていたら除去してクリーンにする
         let strVal = String(c.val);
-        if(strVal.startsWith("-")) {
-            c.val = strVal.replace(/^-+/g, ""); 
+        if(strVal.includes("-")) {
+             c.val = strVal.replace(/-/g, "");
+        }
+
+        // 足し算・引き算モードの場合、文字ではなく「演算子」を切り替える
+        // これにより、数字にマイナスがつかず、行全体が「赤（マイナス）」か「通常（プラス）」に切り替わる
+        if(c.op === '+' || c.op === '-') {
+            // 現在がプラスならマイナスへ、マイナスならプラスへ反転
+            // ※「赤字＝マイナス演算子」なので、ここを切り替えれば色も変わる
+            if(c.op === '-') {
+                c.op = '+';
+            } else {
+                c.op = '-';
+            }
         } else {
-            c.val = "-" + strVal; 
+            // 掛け算・割り算の場合は、仕方ないので数字自体にマイナスをつける（今まで通り）
+            if(c.val !== "") {
+                 c.val = "-" + c.val;
+            }
         }
         
         up(activePos.col, activePos.row); 
@@ -232,6 +254,7 @@
     function bs() { let c = listData[activePos.col][activePos.row]; if(c.val.length > 0) c.val = c.val.slice(0, -1); else c.op = "+"; up(activePos.col, activePos.row); calc(activePos.col); }
     function cellClear() { listData[activePos.col][activePos.row].val = ""; up(activePos.col, activePos.row); calc(activePos.col); }
     
+    // ★修正：黄色い枠でも色を適用するための判定処理
     function up(c, r) { 
         let d = listData[c][r]; 
         let cell = document.getElementById(`c-${c}-${r}`);
@@ -247,7 +270,8 @@
         if(d.op === '*') { s = "×"; cell.classList.add('is-multi'); } 
         if(d.op === '/') { s = "÷"; cell.classList.add('is-div'); } 
         
-        if(parseFloat(d.val) < 0) {
+        // 数字がマイナスの場合も赤くする
+        if(String(d.val).includes("-") || parseFloat(d.val) < 0) {
              cell.classList.add('is-red');
         }
 
